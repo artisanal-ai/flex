@@ -1,0 +1,30 @@
+{
+  "name": "flex",
+  "version": "0.1.0",
+  "description": "Stretch breaks for people who live in Claude Code: the mascot acts out a stretch every few minutes, and every so many prompts it's pinky time, for the finger that hits Enter all day.",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "breakMinutes": {
+      "type": "number",
+      "title": "Minutes between flex breaks",
+      "description": "How often the mascot calls a stretch break.",
+      "default": 10,
+      "min": 1
+    },
+    "pinkyEveryPrompts": {
+      "type": "number",
+      "title": "Prompts between pinky flexes",
+      "description": "Every this many prompts, it's pinky time.",
+      "default": 10,
+      "min": 1
+    },
+    "snoozeMinutes": {
+      "type": "number",
+      "title": "Snooze minutes",
+      "description": "How long Snooze puts a break off.",
+      "default": 5,
+      "min": 1
+    }
+  }
+}

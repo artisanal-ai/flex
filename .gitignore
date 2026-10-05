@@ -1,0 +1,4 @@
+.DS_Store
+# Written by Claude Code when it loads the plugin
+.claude-plugin/types/
+tsconfig.json
