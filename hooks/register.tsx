@@ -19,6 +19,23 @@ const frame = atom({ plugin: 'flex', key: 'frame' } as const, 0)
 
 // The timer that moves the mascot, running only while an exercise shows.
 let animation: Timer | null = null
+// The one timer that brings the next break: the countdown to a body break, or
+// a snoozed break coming back. Done starts a full countdown, so the next break
+// is breakMinutes after the last one closed, however long it stayed up.
+let upcoming: Timer | null = null
+
+function schedule($: EngineInterface, ms: number, fn: () => void) {
+  upcoming?.cancel()
+  upcoming = $.clock.after(ms, () => {
+    upcoming = null
+    fn()
+  })
+}
+
+function unschedule() {
+  upcoming?.cancel()
+  upcoming = null
+}
 
 async function show($: EngineInterface, exercise: Exercise | null) {
   await update($, current, () => exercise)
@@ -31,7 +48,8 @@ async function show($: EngineInterface, exercise: Exercise | null) {
 }
 
 async function showNextBody($: EngineInterface) {
-  if (await read($, isPaused)) {
+  // A pinky break that is up holds the body break back until it is closed.
+  if ((await read($, isPaused)) || (await read($, current)) !== null) {
     return
   }
   const index = await read($, bodyIndex)
@@ -53,14 +71,20 @@ export const register: Register = (on, options) => {
   const snoozeMinutes = Math.max(1, Number(options.snoozeMinutes))
   const pinkyEvery = Math.max(1, Math.round(Number(options.pinkyEveryPrompts)))
 
+  const breakMs = breakMinutes * 60_000
+
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'flex',
       description: 'Stretch breaks: /flex [pinky|off|on|status]',
     })
-    $.clock.every(breakMinutes * 60_000, () => void showNextBody($))
-    // A reload drops the old timers: keep a showing mascot moving.
-    await show($, await read($, current))
+    // A reload drops the old timers: keep a showing mascot moving, or count
+    // down to the next break when none shows.
+    const showing = await read($, current)
+    await show($, showing)
+    if (showing === null) {
+      schedule($, breakMs, () => void showNextBody($))
+    }
 
     return next(e)
   })
@@ -71,10 +95,14 @@ export const register: Register = (on, options) => {
     if (arg === 'off') {
       await update($, isPaused, () => true)
       await show($, null)
+      unschedule()
       return { text: 'Breaks off. /flex on to turn them back on.' }
     }
     if (arg === 'on') {
       await update($, isPaused, () => false)
+      if ((await read($, current)) === null) {
+        schedule($, breakMs, () => void showNextBody($))
+      }
       return { text: `Breaks on. A stretch every ${breakMinutes} min, pinky time every ${pinkyEvery} prompts.` }
     }
     if (arg === 'pinky') {
@@ -88,6 +116,8 @@ export const register: Register = (on, options) => {
       return { text: `Reminders ${paused ? 'paused' : 'on'}. ${count} prompts sent; pinky flex in ${left}.` }
     }
     await update($, isPaused, () => false)
+    unschedule()
+    await show($, null)
     await showNextBody($)
     return { text: 'Flex time.' }
   })
@@ -111,10 +141,13 @@ export const register: Register = (on, options) => {
     }
 
     const { Box, Button, Text } = $.ui.resolve(e)
-    const done = () => show($, null)
+    const done = async () => {
+      await show($, null)
+      schedule($, breakMs, () => void showNextBody($))
+    }
     const snooze = async () => {
       await show($, null)
-      $.clock.after(snoozeMinutes * 60_000, () => void show($, exercise))
+      schedule($, snoozeMinutes * 60_000, () => void show($, exercise))
     }
     const poses = framesFor(exercise)
     const art = poses[(await read($, frame)) % poses.length] ?? []

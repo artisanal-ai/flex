@@ -1,6 +1,6 @@
 {
   "name": "flex",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Stretch breaks for people who live in Claude Code: the mascot acts out a stretch every few minutes, and every so many prompts it's pinky time, for the finger that hits Enter all day.",
   "license": "MIT",
   "types": "./types/index.d.ts",
